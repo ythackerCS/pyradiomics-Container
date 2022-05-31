@@ -1,0 +1,294 @@
+{
+    "name": "pyradiomics-rtstruct-dicom-3dALL",
+    "description": "Runs pyradiomics on DICOM scans and RTStruct objects by way of dcm2niix and plastimatch setup commands.",
+    "type": "docker",
+    "version": "0.2.1",
+    "schema-version": "1.0",
+    "image": "xnat/pyradiomics-dicom-yt-3d:latest",
+    "command-line": "run-pyradiomics.sh /input/scan/ /input/mask/ /input/params/#PARAMS_FILE# /output/ '#SESSION_LABEL#-#SCAN_ID#' '#PYRADIOMICS_OPTIONS#'",
+    "reserve-memory": "1024",
+    "limit-memory": "1024",
+    "mounts": [
+        {
+            "name": "scan-in",
+            "writable": false,
+            "path": "/input/scan"
+        },
+        {
+            "name": "mask-in",
+            "writable": false,
+            "path": "/input/mask"
+        },
+        {
+            "name": "params-in",
+            "writable": false,
+            "path": "/input/params"
+        },
+        {
+            "name": "out",
+            "writable": true,
+            "path": "/output"
+        }
+    ],
+    "inputs": [
+        {
+            "name": "PARAMS_FILE",
+            "description": "Pyradiomics params/settings yaml file, e.g. exampleMR_3mm.yaml, as a project resource.",
+            "user-settable": false,
+            "required": true
+        },
+        {
+            "name": "SCAN_ID",
+            "user-settable": false,
+            "required": true
+        },
+        {
+            "name": "SESSION_LABEL",
+            "user-settable": false,
+            "required": true
+        },
+        {
+            "name": "PYRADIOMICS_OPTIONS",
+            "user-settable": true,
+            "required": false,
+            "default": "--verbosity 5"
+        }
+    ],
+    "outputs": [
+        {
+            "name": "csv",
+            "description": "Pyradiomics stats (csv format)",
+            "mount": "out",
+            "required": true
+        }
+    ],
+    "xnat": [
+        {
+            "name": "pyradiomics-dicom-scan",
+            "label": "Pyradiomics via RTStruct DICOM Scan - yt aaron",
+            "description": "Run pyradiomics on RTSTRUCT - Yash Aaron Pyrad Proj",
+            "contexts": ["xnat:imageScanData"],
+            "external-inputs": [
+                {
+                    "name": "scan",
+                    "description": "Input scan",
+                    "type": "Scan",
+                    "required": true
+                }
+            ],
+            "derived-inputs": [
+                {
+                    "name": "scan-id",
+                    "type": "string",
+                    "user-settable": false,
+                    "required": true,
+                    "derived-from-wrapper-input": "scan",
+                    "derived-from-xnat-object-property": "id",
+                    "provides-value-for-command-input": "SCAN_ID"
+                },
+                {
+                    "name": "scan-resource",
+                    "type": "Resource",
+                    "required": true,
+                    "derived-from-wrapper-input": "scan",
+                    "matcher": "@.label == 'DICOM'",
+                    "provides-files-for-command-mount": "scan-in",
+                    "via-setup-command": "xnat/dcm2niix:dev:dcm2niix-setup"
+                },
+                {
+                    "name": "session",
+                    "type": "Session",
+                    "required": true,
+                    "derived-from-wrapper-input": "scan"
+                },
+                {
+                    "name": "session-label",
+                    "type": "string",
+                    "derived-from-wrapper-input": "session",
+                    "derived-from-xnat-object-property": "label",
+                    "provides-value-for-command-input": "SESSION_LABEL",
+                    "user-settable": false,
+                    "required": true
+                },
+                {
+                    "name": "project",
+                    "type": "Project",
+                    "derived-from-wrapper-input": "session",
+                    "user-settable": false,
+                    "required": true,
+                    "load-children": true
+                },
+                {
+                    "name": "params-resource",
+                    "type": "Resource",
+                    "required": true,
+                    "derived-from-wrapper-input": "project",
+                    "matcher": "@.label == 'PYRADIOMICS_PARAMS'",
+                    "provides-files-for-command-mount": "params-in"
+                },
+                {
+                    "name": "params-file",
+                    "type": "File",
+                    "derived-from-wrapper-input": "params-resource",
+                    "required": true,
+                    "matcher": "@.name =~ /.*?yaml.*/"
+                },
+                {
+                    "name": "params-file-name",
+                    "type": "string",
+                    "derived-from-wrapper-input": "params-file",
+                    "derived-from-xnat-object-property": "name",
+                    "user-settable": false,
+                    "required": true,
+                    "provides-value-for-command-input": "PARAMS_FILE"
+                },
+                {
+                    "name": "mask-assessor",
+                    "type": "Assessor",
+                    "derived-from-wrapper-input": "session",
+                    "matcher": "@.xsiType == 'icr:roiCollectionData'",
+                    "required": true
+                },
+                {
+                    "name": "mask-resource",
+                    "type": "Resource",
+                    "derived-from-wrapper-input": "mask-assessor",
+                    "matcher": "@.label == 'RTSTRUCT'",
+                    "provides-files-for-command-mount": "mask-in",
+                    "required": true,
+                    "via-setup-command": "xnat/plastimatch:dev:plastimatch-setup"
+                }
+            ],
+            "output-handlers": [
+                {
+                    "name": "output-resource",
+                    "type": "Resource",
+                    "accepts-command-output": "csv",
+                    "as-a-child-of": "session",
+                    "label": "PYRADIOMICS"
+                }
+            ]
+        },
+        {
+            "name": "pyradiomics-dicom-rtstruct",
+            "label": "Pyradiomics via RTStruct ROI Collection - yt aaron",
+            "description": "Run pyradiomics on ROI Collection assessor - derive parent scan.",
+            "contexts": ["icr:roiCollectionData"],
+            "external-inputs": [
+                {
+                    "name": "assessor",
+                    "description": "ROICollection assessor",
+                    "type": "Assessor",
+                    "matcher": "@.xsiType == 'icr:roiCollectionData'",
+                    "required": true
+                }
+            ],
+            "derived-inputs": [
+                {
+                    "name": "mask-resource",
+                    "type": "Resource",
+                    "derived-from-wrapper-input": "assessor",
+                    "matcher": "@.label == 'RTSTRUCT'",
+                    "provides-files-for-command-mount": "mask-in",
+                    "required": true,
+                    "via-setup-command": "xnat/plastimatch:dev:plastimatch-setup"
+                },
+                {
+                    "name": "series-uid",
+                    "label": "series-uid",
+                    "description": "Parent scan series uid extracted from ROICollection XML.",
+                    "type": "string",
+                    "required": true,
+                    "replacement-key": "#series-uid#",
+                    "derived-from-wrapper-input": "assessor",
+                    "derived-from-xnat-object-property": "datatype-string",
+                    "parser": "/XFTItem/references_seriesuid_roicollectiondata_seriesuid0[1]/XFTItem[1]/seriesuid[1]"
+                },
+                {
+                    "name": "session",
+                    "type": "Session",
+                    "required": true,
+                    "derived-from-wrapper-input": "assessor"
+                },
+                {
+                    "name": "session-label",
+                    "type": "string",
+                    "derived-from-wrapper-input": "session",
+                    "derived-from-xnat-object-property": "label",
+                    "provides-value-for-command-input": "SESSION_LABEL",
+                    "user-settable": false,
+                    "required": true
+                },
+                {
+                    "name": "scan",
+                    "description": "Input scan. Selection based on Reference UID in ROI Collection assessor.",
+                    "type": "Scan",
+                    "matcher": "'DICOM' in @.resources[*].label && @.uid =~ /#series-uid#|^$/",
+                    "required": true,
+                    "load-children": true,
+                    "derived-from-wrapper-input": "session",
+                    "multiple": false
+                },
+                {
+                    "name": "scan-id",
+                    "type": "string",
+                    "user-settable": false,
+                    "required": true,
+                    "derived-from-wrapper-input": "scan",
+                    "derived-from-xnat-object-property": "id",
+                    "provides-value-for-command-input": "SCAN_ID"
+                },
+                {
+                    "name": "scan-resource",
+                    "type": "Resource",
+                    "required": true,
+                    "derived-from-wrapper-input": "scan",
+                    "matcher": "@.label == 'DICOM'",
+                    "provides-files-for-command-mount": "scan-in",
+                    "via-setup-command": "xnat/dcm2niix:dev:dcm2niix-setup"
+                },
+                {
+                    "name": "project",
+                    "type": "Project",
+                    "derived-from-wrapper-input": "session",
+                    "user-settable": false,
+                    "required": true,
+                    "load-children": true
+                },
+                {
+                    "name": "params-resource",
+                    "type": "Resource",
+                    "required": true,
+                    "derived-from-wrapper-input": "project",
+                    "matcher": "@.label == 'PYRADIOMICS_PARAMS'",
+                    "provides-files-for-command-mount": "params-in"
+                },
+                {
+                    "name": "params-file",
+                    "type": "File",
+                    "derived-from-wrapper-input": "params-resource",
+                    "required": true,
+                    "matcher": "@.name =~ /.*?yaml.*/"
+                },
+                {
+                    "name": "params-file-name",
+                    "type": "string",
+                    "derived-from-wrapper-input": "params-file",
+                    "derived-from-xnat-object-property": "name",
+                    "user-settable": false,
+                    "required": true,
+                    "provides-value-for-command-input": "PARAMS_FILE"
+                }
+            ],
+            "output-handlers": [
+                {
+                    "name": "output-resource",
+                    "type": "Resource",
+                    "accepts-command-output": "csv",
+                    "as-a-child-of": "session",
+                    "label": "PYRADIOMICS"
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,8 @@
+{
+    "name": "plastimatch-setup",
+    "description": "Converts RTStruct ROIs to NIFTI masks using 'plastimatch convert'.",
+    "version": "1.0",
+    "type": "docker-setup",
+    "image": "xnat/plastimatch:dev",
+    "command-line": "find /input -name *.dcm -exec plastimatch convert --input {} --output-prefix /output --prefix-format nii --output-ss-list /output/RSTT.txt \\;"
+}

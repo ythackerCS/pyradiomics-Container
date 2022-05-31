@@ -1,0 +1,5 @@
+FROM radiomics/pyradiomics:CLI
+
+ADD ./workspace/run-pyradiomics.sh /usr/local/bin/
+ADD ./workspace/generate-pyradiomics-xml-from-csv /usr/local/bin/
+ENTRYPOINT []

@@ -1,0 +1,8 @@
+{
+    "name": "dcm2niix-setup",
+    "description": "Converts DICOM to NIFTI",
+    "version": "1.0",
+    "type": "docker-setup",
+    "image": "xnat/dcm2niix:dev",
+    "command-line": "dcm2niix -o /output /input"
+}
